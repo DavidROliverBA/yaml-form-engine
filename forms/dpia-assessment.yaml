@@ -1,0 +1,164 @@
+form:
+  id: dpia-assessment
+  title: "Data Protection Impact Assessment"
+  description: "Structured DPIA questionnaire for systems processing personal data."
+  version: "1.0"
+
+  steps:
+    - id: project
+      title: "Project Details"
+      type: input
+      layout: columns
+      fields:
+        - id: project_name
+          type: text
+          label: "Project Name"
+          placeholder: "e.g., Customer Analytics Platform"
+          required: true
+        - id: project_lead
+          type: text
+          label: "Project Lead"
+          required: true
+        - id: date
+          type: date
+          label: "Assessment Date"
+          default: today
+        - id: data_controller
+          type: text
+          label: "Data Controller"
+          placeholder: "Legal entity name"
+
+    - id: data_scope
+      title: "Data Scope"
+      type: input
+      fields:
+        - id: data_types
+          type: multiselect
+          label: "Personal Data Types Processed"
+          options:
+            - { value: name, label: "Name" }
+            - { value: email, label: "Email Address" }
+            - { value: dob, label: "Date of Birth" }
+            - { value: address, label: "Postal Address" }
+            - { value: phone, label: "Phone Number" }
+            - { value: financial, label: "Financial Data" }
+            - { value: health, label: "Health Data (Special Category)" }
+            - { value: location, label: "Location / GPS Data" }
+            - { value: biometric, label: "Biometric Data (Special Category)" }
+            - { value: employment, label: "Employment Data" }
+            - { value: browsing, label: "Browsing / Behavioural Data" }
+            - { value: images, label: "Images / CCTV" }
+        - id: volume
+          type: select
+          label: "Data Volume (Records)"
+          options:
+            - { value: under_1k, label: "Under 1,000" }
+            - { value: 1k_10k, label: "1,000 - 10,000" }
+            - { value: 10k_100k, label: "10,000 - 100,000" }
+            - { value: 100k_1m, label: "100,000 - 1,000,000" }
+            - { value: over_1m, label: "Over 1,000,000" }
+        - id: data_subjects
+          type: multiselect
+          label: "Data Subject Categories"
+          options:
+            - { value: customers, label: "Customers" }
+            - { value: employees, label: "Employees" }
+            - { value: suppliers, label: "Suppliers / Partners" }
+            - { value: children, label: "Children (under 18)" }
+            - { value: vulnerable, label: "Vulnerable Individuals" }
+            - { value: public, label: "Members of the Public" }
+        - id: purpose
+          type: textarea
+          label: "Purpose of Processing"
+          placeholder: "Describe why this personal data is being processed..."
+          height: 120
+        - id: legal_basis
+          type: select
+          label: "Legal Basis (GDPR Article 6)"
+          options:
+            - { value: consent, label: "(a) Consent" }
+            - { value: contract, label: "(b) Contractual Necessity" }
+            - { value: legal_obligation, label: "(c) Legal Obligation" }
+            - { value: vital_interests, label: "(d) Vital Interests" }
+            - { value: public_task, label: "(e) Public Task" }
+            - { value: legitimate_interests, label: "(f) Legitimate Interests" }
+
+    - id: risk_assessment
+      title: "Risk Assessment"
+      type: input
+      fields:
+        - id: necessity
+          type: score
+          label: "Necessity & Proportionality"
+          scale: [0, 3]
+          labels:
+            0: "Not justified"
+            1: "Weak justification"
+            2: "Adequately justified"
+            3: "Strongly justified — minimal data for purpose"
+        - id: risk_individuals
+          type: score
+          label: "Risk to Individuals"
+          scale: [0, 3]
+          labels:
+            0: "Negligible risk"
+            1: "Low risk"
+            2: "Moderate risk — potential for harm"
+            3: "High risk — significant potential harm"
+        - id: risk_discrimination
+          type: score
+          label: "Risk of Discrimination"
+          scale: [0, 3]
+          labels:
+            0: "No discrimination risk"
+            1: "Low"
+            2: "Moderate"
+            3: "High — profiling or automated decision-making"
+        - id: risk_financial
+          type: score
+          label: "Financial Loss Risk"
+          scale: [0, 3]
+          labels:
+            0: "No financial risk"
+            1: "Low"
+            2: "Moderate"
+            3: "High — direct financial impact"
+        - id: risk_reputation
+          type: score
+          label: "Reputational Risk"
+          scale: [0, 3]
+          labels:
+            0: "Minimal"
+            1: "Low"
+            2: "Moderate"
+            3: "High — public trust impact"
+        - id: mitigations
+          type: textarea
+          label: "Proposed Mitigations"
+          placeholder: "Describe technical and organisational measures to reduce risk..."
+          height: 150
+
+    - id: summary
+      title: "Summary"
+      type: computed
+      metrics:
+        - label: "Avg Risk Score"
+          calc: "avg(risk_assessment.*)"
+        - label: "Necessity Score"
+          calc: "sum(risk_assessment.necessity)"
+        - label: "High Risks (Score 3)"
+          calc: "count_where(risk_assessment.* == 3)"
+
+    - id: export
+      title: "Export"
+      type: export
+      formats:
+        - id: markdown
+          label: "Markdown"
+          filename: "dpia-{project.project_name}.md"
+        - id: json
+          label: "JSON"
+          filename: "dpia-{project.project_name}.json"
+        - id: csv
+          label: "CSV"
+          filename: "dpia-{project.project_name}.csv"

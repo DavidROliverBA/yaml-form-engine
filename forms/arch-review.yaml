@@ -1,0 +1,98 @@
+form:
+  id: arch-review
+  title: "Architecture Review Checklist"
+  description: "Score a system's architecture against standard review criteria."
+  version: "1.0"
+
+  data_source:
+    path: "../data/sample-criteria.yaml"
+    key: categories
+    id_field: id
+    label_field: title
+    items_key: criteria
+
+  steps:
+    - id: system
+      title: "System Under Review"
+      type: input
+      layout: columns
+      fields:
+        - id: system_name
+          type: text
+          label: "System Name"
+          placeholder: "e.g., Booking Service, Data Platform"
+          required: true
+        - id: reviewer
+          type: text
+          label: "Reviewer"
+          placeholder: "Your name"
+        - id: review_type
+          type: select
+          label: "Review Type"
+          options:
+            - { value: hld, label: "High-Level Design" }
+            - { value: lld, label: "Low-Level Design" }
+            - { value: security, label: "Security Review" }
+            - { value: performance, label: "Performance Review" }
+            - { value: dr, label: "Disaster Recovery" }
+        - id: date
+          type: date
+          label: "Review Date"
+          default: today
+
+    - id: checklist
+      title: "Review Checklist"
+      type: data_driven
+      group_by: section
+      per_item:
+        - id: score
+          type: score
+          label: "Score"
+          scale: [0, 3]
+          labels:
+            0: "Not Addressed"
+            1: "Implied"
+            2: "Partially Addressed"
+            3: "Fully Addressed"
+        - id: evidence
+          type: textarea
+          label: "Evidence / Comments"
+          placeholder: "Where is this addressed? What's missing?"
+          height: 80
+
+      display_fields:
+        - field: description
+          label: "Criterion"
+          style: body
+
+    - id: summary
+      title: "Summary"
+      type: computed
+      metrics:
+        - label: "Average Score"
+          calc: "avg(checklist.score)"
+        - label: "Critical Gaps (Score 0)"
+          calc: "count_where(checklist.score == 0)"
+        - label: "Fully Addressed"
+          calc: "count_where(checklist.score == 3)"
+        - label: "Items Reviewed"
+          calc: "count(checklist.score)"
+      tables:
+        - title: "Section Breakdown"
+          group_by: section
+        - title: "Outstanding Gaps"
+          filter: "checklist.score in [0, 1]"
+
+    - id: export
+      title: "Export"
+      type: export
+      formats:
+        - id: markdown
+          label: "Markdown"
+          filename: "{system.system_name}-arch-review.md"
+        - id: csv
+          label: "CSV"
+          filename: "{system.system_name}-arch-review.csv"
+        - id: json
+          label: "JSON"
+          filename: "{system.system_name}-arch-review.json"

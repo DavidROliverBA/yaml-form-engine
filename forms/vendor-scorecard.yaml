@@ -1,0 +1,149 @@
+form:
+  id: vendor-scorecard
+  title: "Vendor Evaluation Scorecard"
+  description: "Score vendor proposals against weighted evaluation criteria."
+  version: "1.0"
+
+  steps:
+    - id: vendor
+      title: "Vendor Details"
+      type: input
+      layout: columns
+      fields:
+        - id: vendor_name
+          type: text
+          label: "Vendor Name"
+          placeholder: "e.g., Acme Corp"
+          required: true
+        - id: evaluator
+          type: text
+          label: "Evaluator"
+          required: true
+        - id: date
+          type: date
+          label: "Evaluation Date"
+          default: today
+        - id: eval_type
+          type: select
+          label: "Evaluation Type"
+          options:
+            - { value: rfi, label: "RFI Response" }
+            - { value: rfp, label: "RFP Response" }
+            - { value: poc, label: "Proof of Concept" }
+            - { value: demo, label: "Product Demo" }
+
+    - id: scoring
+      title: "Evaluation Criteria"
+      type: input
+      description: "Score each criterion on a 0-3 scale with justification."
+      fields:
+        - id: functionality_score
+          type: score
+          label: "Functional Requirements"
+          scale: [0, 3]
+          labels:
+            0: "Does not meet requirements"
+            1: "Partially meets requirements"
+            2: "Meets requirements"
+            3: "Exceeds requirements"
+        - id: functionality_notes
+          type: textarea
+          label: "Functional Requirements — Justification"
+          height: 80
+        - id: technical_score
+          type: score
+          label: "Technical Architecture"
+          scale: [0, 3]
+          labels:
+            0: "Poor fit"
+            1: "Acceptable with significant changes"
+            2: "Good fit"
+            3: "Excellent fit — aligns with target architecture"
+        - id: technical_notes
+          type: textarea
+          label: "Technical Architecture — Justification"
+          height: 80
+        - id: security_score
+          type: score
+          label: "Security & Compliance"
+          scale: [0, 3]
+          labels:
+            0: "Fails security requirements"
+            1: "Gaps requiring remediation"
+            2: "Meets baseline requirements"
+            3: "Strong security posture — exceeds baseline"
+        - id: security_notes
+          type: textarea
+          label: "Security & Compliance — Justification"
+          height: 80
+        - id: integration_score
+          type: score
+          label: "Integration Capability"
+          scale: [0, 3]
+          labels:
+            0: "No standard integration"
+            1: "Limited integration options"
+            2: "Good API / integration support"
+            3: "Comprehensive integration — REST, events, SDK"
+        - id: integration_notes
+          type: textarea
+          label: "Integration Capability — Justification"
+          height: 80
+        - id: cost_score
+          type: score
+          label: "Commercial / Cost"
+          scale: [0, 3]
+          labels:
+            0: "Significantly over budget"
+            1: "Over budget but negotiable"
+            2: "Within budget"
+            3: "Strong value for money"
+        - id: cost_notes
+          type: textarea
+          label: "Commercial / Cost — Justification"
+          height: 80
+        - id: vendor_score
+          type: score
+          label: "Vendor Viability"
+          scale: [0, 3]
+          labels:
+            0: "High risk — stability concerns"
+            1: "Some concerns"
+            2: "Established vendor"
+            3: "Market leader — strong track record"
+        - id: vendor_notes
+          type: textarea
+          label: "Vendor Viability — Justification"
+          height: 80
+
+    - id: recommendation
+      title: "Recommendation"
+      type: input
+      fields:
+        - id: overall_recommendation
+          type: select
+          label: "Overall Recommendation"
+          options:
+            - { value: proceed, label: "Proceed — Recommended" }
+            - { value: shortlist, label: "Shortlist — Further Evaluation" }
+            - { value: reserve, label: "Reserve — Acceptable Backup" }
+            - { value: reject, label: "Reject — Does Not Meet Requirements" }
+        - id: summary_notes
+          type: textarea
+          label: "Summary & Key Observations"
+          placeholder: "Overall assessment, key strengths, concerns, and next steps..."
+          height: 150
+
+    - id: export
+      title: "Export"
+      type: export
+      formats:
+        - id: markdown
+          label: "Markdown"
+          filename: "vendor-eval-{vendor.vendor_name}.md"
+        - id: json
+          label: "JSON"
+          filename: "vendor-eval-{vendor.vendor_name}.json"
+        - id: csv
+          label: "CSV"
+          filename: "vendor-eval-{vendor.vendor_name}.csv"

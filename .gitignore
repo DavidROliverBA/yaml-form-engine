@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Form state (local user data — never commit)
+.form-state/
+*.form-state.json
+
+# Output exports
+output/
+exports/
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Claude Code
+.claude/settings.local.json

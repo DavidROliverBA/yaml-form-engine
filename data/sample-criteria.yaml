@@ -1,0 +1,54 @@
+version: "1.0"
+
+categories:
+  - id: design
+    name: Design Quality
+    criteria:
+      - id: DQ-01
+        title: Separation of Concerns
+        description: "System components have clear boundaries and single responsibilities"
+      - id: DQ-02
+        title: API Design
+        description: "APIs follow RESTful conventions with versioning and documentation"
+      - id: DQ-03
+        title: Error Handling
+        description: "Comprehensive error handling with meaningful messages and recovery paths"
+
+  - id: security
+    name: Security
+    criteria:
+      - id: SEC-01
+        title: Authentication
+        description: "All endpoints require authentication with appropriate strength"
+      - id: SEC-02
+        title: Authorisation
+        description: "Role-based access control with principle of least privilege"
+      - id: SEC-03
+        title: Data Protection
+        description: "Sensitive data encrypted at rest and in transit"
+
+  - id: reliability
+    name: Reliability
+    criteria:
+      - id: REL-01
+        title: Failure Modes
+        description: "Known failure modes documented with mitigation strategies"
+      - id: REL-02
+        title: Monitoring
+        description: "Health checks, metrics, and alerting configured"
+      - id: REL-03
+        title: Recovery
+        description: "RTO/RPO defined with tested recovery procedures"
+
+  - id: operations
+    name: Operational Readiness
+    criteria:
+      - id: OPS-01
+        title: Deployment
+        description: "Automated, repeatable deployment pipeline with rollback"
+      - id: OPS-02
+        title: Runbooks
+        description: "Operational runbooks for common scenarios and incidents"
+      - id: OPS-03
+        title: Logging
+        description: "Structured logging with correlation IDs and appropriate retention"
