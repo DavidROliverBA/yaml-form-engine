@@ -153,6 +153,8 @@ def _cmd_submit(args):
                     "arguments": payload,
                 }
                 print(json.dumps(output, indent=2))
+                # Brief pause so the browser finishes rendering before we kill the server
+                time.sleep(2)
                 _stop_server(proc)
                 sys.exit(0)
             time.sleep(0.5)
