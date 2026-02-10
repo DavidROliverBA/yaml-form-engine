@@ -61,6 +61,16 @@ def _cmd_generate(args):
     output_path = generate_form(schema, output_dir)
     print(f"Generated: {output_path}")
 
+    if args.launch:
+        print(f"Launching: {output_path}")
+
+        class RunArgs:
+            pass
+        run_args = RunArgs()
+        run_args.form = output_path
+        run_args.port = args.port
+        _cmd_run(run_args)
+
 
 def _cmd_list(args):
     """List available forms."""
@@ -100,6 +110,8 @@ def main():
     gen_parser.add_argument("--schema-file", help="Path to JSON schema file")
     gen_parser.add_argument("--schema-stdin", action="store_true", help="Read schema from stdin")
     gen_parser.add_argument("--output", "-o", help="Output directory (default: forms/mcp)")
+    gen_parser.add_argument("--launch", "-l", action="store_true", help="Launch the form immediately after generating")
+    gen_parser.add_argument("--port", default=None, help="Streamlit port when using --launch")
 
     # yfe list
     list_parser = subparsers.add_parser("list", help="List available forms")
