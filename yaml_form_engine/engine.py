@@ -754,6 +754,6 @@ def _render_filtered_table(items: list, step_responses: dict, filter_expr: str, 
         st.success("No outstanding items.")
 
 
-# Entry point when run via streamlit
-if __name__ == "__main__" or "streamlit" in sys.modules:
+# Entry point when running engine.py directly (not via _app.py)
+if __name__ == "__main__":
     run()

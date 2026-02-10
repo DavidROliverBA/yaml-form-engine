@@ -126,6 +126,15 @@ def wait_for_streamlit(page, timeout: float = 10_000) -> None:
     page.wait_for_timeout(500)
 
 
+def assert_no_streamlit_errors(page) -> None:
+    """Fail fast if the page has any Streamlit error or exception elements."""
+    for testid in ("stException", "stError"):
+        error = page.locator(f'[data-testid="{testid}"]')
+        if error.count() > 0:
+            text = error.first.text_content().strip()[:300]
+            pytest.fail(f"Streamlit rendered an error on load: {text}")
+
+
 @pytest.fixture
 def form_page(page, streamlit_server):
     """Navigate to the form and return a FormPage instance."""
@@ -135,4 +144,5 @@ def form_page(page, streamlit_server):
     # Wait for initial Streamlit render
     page.wait_for_selector('[data-testid="stSidebar"]', timeout=15000)
     wait_for_streamlit(page)
+    assert_no_streamlit_errors(page)
     return FormPage(page)
