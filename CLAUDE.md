@@ -66,6 +66,25 @@ To create a new form YAML:
 6. Export steps define `formats` with `id`, `label`, `filename`
 7. Submit steps define `mcp` with `server` and `tool` — builds JSON payloads from form responses
 
+## CLI Commands
+
+```bash
+yfe run <form.yaml>                    # Run a form in Streamlit
+yfe submit <form.yaml>                 # Launch form, capture payload, output JSON to stdout
+yfe generate --schema-file <schema>    # Generate form from MCP tool schema
+yfe list                               # List available forms
+```
+
+### Submit Command
+
+`yfe submit` launches a form, waits for the user to complete it, and outputs structured JSON to stdout:
+
+```json
+{"server": "MCP_DOCKER", "tool": "API-post-search", "arguments": {"query": "test"}}
+```
+
+Only works with MCP forms (those with a `submit` step containing `mcp.server` and `mcp.tool`). Port 8503 by default. Exit codes: 0 (success), 1 (error), 2 (timeout), 130 (Ctrl+C).
+
 ## MCP Form Generation
 
 Generate forms from MCP tool schemas:

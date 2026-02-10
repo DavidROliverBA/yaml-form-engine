@@ -25,6 +25,9 @@ pip install -e .
 # Run a form
 yfe forms/arch-review.yaml
 
+# Submit an MCP form and capture the payload automatically
+yfe submit forms/mcp/notion-search.yaml
+
 # List all available forms
 yfe list
 
@@ -32,7 +35,7 @@ yfe list
 yfe generate --schema-file tools/my-tool.json
 ```
 
-Open http://localhost:8501 in your browser.
+Open http://localhost:8501 in your browser (or 8503 for `yfe submit`).
 
 ## Security Model
 
@@ -368,16 +371,37 @@ steps:
 
 ### Using with Claude Code
 
-The typical workflow with Claude Code:
+**Recommended flow using `yfe submit`** (auto-captures the payload):
 
-1. **Claude Code reads the tool schema** via ToolSearch
-2. **Saves it to a JSON file** (or pipes it directly)
-3. **Runs `yfe generate`** to produce the YAML form
-4. **You open the form** in Streamlit and fill it in
-5. **Copy the payload** from the submit step
-6. **Claude Code invokes the MCP tool** with the payload
+1. **Claude Code runs `yfe submit`** with a pre-built or generated form
+2. **You fill in the form** in the browser
+3. **Navigate to the Submit step** — the payload is captured automatically
+4. **Claude Code receives structured JSON** on stdout and invokes the MCP tool
 
-Or use the pre-built gallery forms in `forms/mcp/` — they're ready to run.
+```bash
+# Launch form, open browser, wait for submission, output JSON
+yfe submit forms/mcp/notion-search.yaml
+# Outputs: {"server": "MCP_DOCKER", "tool": "API-post-search", "arguments": {...}}
+```
+
+**Submit command options:**
+
+```bash
+yfe submit <form.yaml>                    # Default: port 8503, 5min timeout
+yfe submit <form.yaml> --port 8504        # Custom port
+yfe submit <form.yaml> --no-browser       # Don't open browser
+yfe submit <form.yaml> --timeout 60       # Shorter timeout (seconds)
+```
+
+**Exit codes:** 0 (success), 1 (error), 2 (timeout), 130 (Ctrl+C)
+
+**Alternative manual flow** (using `yfe run`):
+
+1. Run `yfe run forms/mcp/<tool>.yaml` and fill in the form
+2. Copy the payload from the submit step
+3. Give it to Claude Code to invoke the MCP tool
+
+Pre-built forms are in `forms/mcp/` — ready to use without generation.
 
 ## Creating Your Own Forms
 
