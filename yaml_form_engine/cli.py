@@ -23,7 +23,7 @@ def _cmd_run(args):
         print(f"Error: Form file not found: {form_path}", file=sys.stderr)
         sys.exit(1)
 
-    engine_path = os.path.join(os.path.dirname(__file__), "engine.py")
+    engine_path = os.path.join(os.path.dirname(__file__), "_app.py")
     port = args.port or "8501"
 
     cmd = [
