@@ -19,12 +19,17 @@ Building a Streamlit form takes ~2,000+ tokens and custom Python code per form. 
 # Install dependencies
 pip install streamlit pyyaml pandas
 
-# Run a form
-streamlit run yaml_form_engine/engine.py -- --form forms/arch-review.yaml
-
-# Or use the CLI
+# Install the CLI
 pip install -e .
+
+# Run a form
 yfe forms/arch-review.yaml
+
+# List all available forms
+yfe list
+
+# Generate a form from an MCP tool schema
+yfe generate --schema-file tools/my-tool.json
 ```
 
 Open http://localhost:8501 in your browser.
@@ -45,11 +50,28 @@ See [docs/security.md](docs/security.md) for the full threat model.
 
 ## Example Forms
 
+### Custom Forms
+
 | Form | Description | Launch |
 |------|-------------|--------|
 | `arch-review.yaml` | Architecture review checklist with 0-3 scoring | `yfe forms/arch-review.yaml` |
 | `dpia-assessment.yaml` | Data Protection Impact Assessment questionnaire | `yfe forms/dpia-assessment.yaml` |
 | `vendor-scorecard.yaml` | Vendor evaluation with weighted criteria | `yfe forms/vendor-scorecard.yaml` |
+
+### MCP Tool Forms (Pre-Built)
+
+Forms generated from MCP tool schemas. Fill in the form, get a validated JSON payload for the tool.
+
+| Form | MCP Tool | Server | Launch |
+|------|----------|--------|--------|
+| `notion-create-page.yaml` | `API-post-page` | Notion (MCP_DOCKER) | `yfe forms/mcp/notion-create-page.yaml` |
+| `notion-search.yaml` | `API-post-search` | Notion (MCP_DOCKER) | `yfe forms/mcp/notion-search.yaml` |
+| `jira-create-issue.yaml` | `createJiraIssue` | Jira (Atlassian) | `yfe forms/mcp/jira-create-issue.yaml` |
+| `jira-search.yaml` | `searchJiraIssuesUsingJql` | Jira (Atlassian) | `yfe forms/mcp/jira-search.yaml` |
+| `confluence-create-page.yaml` | `createConfluencePage` | Confluence (Atlassian) | `yfe forms/mcp/confluence-create-page.yaml` |
+| `confluence-search.yaml` | `searchConfluenceUsingCql` | Confluence (Atlassian) | `yfe forms/mcp/confluence-search.yaml` |
+| `diagram-generate.yaml` | `generate_diagram` | Diagrams (MCP_DOCKER) | `yfe forms/mcp/diagram-generate.yaml` |
+| `youtube-transcript.yaml` | `get_transcript` | YouTube (MCP_DOCKER) | `yfe forms/mcp/youtube-transcript.yaml` |
 
 ## YAML Schema
 
@@ -117,6 +139,7 @@ form:
 | `computed` | Auto-calculated summary with metrics and tables |
 | `export` | Download in markdown, CSV, JSON, or Confluence format |
 | `info` | Read-only display (instructions, context) |
+| `submit` | Build and display an MCP tool invocation payload |
 
 ### Field Types
 
@@ -203,11 +226,158 @@ fields:
 | `fields.py` | Maps field types to Streamlit widgets |
 | `expressions.py` | Safe expression evaluator (no eval/exec) |
 | `exporters.py` | Export to markdown, Confluence, CSV, JSON |
-| `cli.py` | CLI entry point (`yfe` command) |
+| `cli.py` | CLI entry point (`yfe` command) with subcommands |
+| `type_mapper.py` | Maps JSON Schema properties to YAML form field types |
+| `mcp_introspect.py` | Parses MCP tool definitions into normalised schemas |
+| `form_generator.py` | Generates complete YAML forms from tool schemas |
+| `mcp_invoker.py` | Coerces form responses to typed JSON payloads |
 
 ## Auto-Save
 
 Form state is automatically saved to `.form-state/<form-id>.json` after every interaction. Close the browser and reopen — your data is still there. The `.form-state/` directory is gitignored by default.
+
+## MCP Form Generation
+
+Generate GUI forms from any MCP tool's JSON Schema — no Python code needed.
+
+### How It Works
+
+```
+MCP Tool Schema (JSON) ──> Generator ──> YAML Form Definition
+                                                │
+                                           User fills form
+                                                │
+                                           Submit step ──> Validated JSON Payload
+```
+
+The generator reads a tool's parameter schema and produces a YAML form with:
+- **Input steps** for each parameter group (flat fields in one step, nested objects as separate steps)
+- **A review step** showing tool metadata
+- **A submit step** that builds a validated JSON payload, previews it, and offers copy/download
+
+### CLI Usage
+
+```bash
+# Generate from a JSON schema file
+yfe generate --schema-file tools/notion-create-page.json
+
+# Generate from piped JSON (e.g., from Claude Code)
+echo '{"name": "my-tool", ...}' | yfe generate --schema-stdin
+
+# Specify output directory
+yfe generate --schema-file tools/foo.json --output forms/custom/
+
+# List all available forms (including generated ones)
+yfe list
+
+# Run a generated form
+yfe run forms/mcp/notion-search.yaml
+yfe forms/mcp/jira-create-issue.yaml    # shorthand (backwards compatible)
+```
+
+### Schema Input Formats
+
+The generator accepts three schema formats:
+
+**Format A — Full MCP tool definition:**
+```json
+{
+  "name": "API-post-page",
+  "server": "MCP_DOCKER",
+  "description": "Create a page in Notion",
+  "inputSchema": {
+    "type": "object",
+    "properties": { "title": { "type": "string" } },
+    "required": ["title"]
+  }
+}
+```
+
+**Format B — Claude Code tool definition:**
+```json
+{
+  "name": "mcp__MCP_DOCKER__API-post-search",
+  "description": "Search Notion",
+  "parameters": {
+    "type": "object",
+    "properties": { "query": { "type": "string" } },
+    "required": ["query"]
+  }
+}
+```
+
+**Format C — Bare JSON Schema with metadata:**
+```json
+{
+  "name": "create-issue",
+  "server": "jira",
+  "description": "Create a Jira issue",
+  "properties": { "summary": { "type": "string" } },
+  "required": ["summary"]
+}
+```
+
+### Type Mapping Rules
+
+The generator automatically maps JSON Schema types to the best form widget:
+
+| JSON Schema | Constraints | Form Widget |
+|-------------|-------------|-------------|
+| `string` | plain | `text` |
+| `string` | enum with 1-4 values | `radio` |
+| `string` | enum with 5+ values | `select` |
+| `string` | maxLength > 200 or name contains "description", "body", etc. | `textarea` |
+| `number` / `integer` | no range, or range > 20 | `number` |
+| `number` / `integer` | min + max with range <= 20 | `slider` |
+| `boolean` | — | `checkbox` |
+| `array` | items with enum | `multiselect` |
+| `array` | items without enum | `textarea` (one item per line) |
+| `object` | — | separate wizard step (recurse) |
+
+Additional mappings:
+- `required` in parent → `required: true` on field
+- `default` → `default: <value>`
+- `title` or `description` → `label`
+- `minimum` / `maximum` → `min` / `max`
+- `pattern` → `placeholder: "Format: <pattern>"`
+
+### The Submit Step
+
+Generated forms include a `submit` step that:
+
+1. Collects responses from all previous steps
+2. Coerces values to the correct JSON Schema types (strings → integers, booleans, etc.)
+3. Reconstructs nested objects from step-based field groups
+4. Displays a JSON payload preview
+5. Offers "Copy Invocation" (formatted for Claude Code) and "Download Payload (JSON)"
+6. Saves the payload to `.form-state/<form-id>-payload.json`
+
+```yaml
+steps:
+  - id: submit
+    title: "Submit"
+    type: submit
+    mcp:
+      server: MCP_DOCKER
+      tool: API-post-page
+    confirm: true          # Show confirmation before displaying command
+    show_payload: true     # Preview the JSON payload
+```
+
+**Security note:** The submit step does NOT execute MCP tools directly. It produces a validated payload for you (or Claude Code) to invoke. No network calls are made.
+
+### Using with Claude Code
+
+The typical workflow with Claude Code:
+
+1. **Claude Code reads the tool schema** via ToolSearch
+2. **Saves it to a JSON file** (or pipes it directly)
+3. **Runs `yfe generate`** to produce the YAML form
+4. **You open the form** in Streamlit and fill it in
+5. **Copy the payload** from the submit step
+6. **Claude Code invokes the MCP tool** with the payload
+
+Or use the pre-built gallery forms in `forms/mcp/` — they're ready to run.
 
 ## Creating Your Own Forms
 
@@ -222,6 +392,13 @@ Or have an AI generate the YAML from a natural language description:
 > and action items. Use a 0-3 scoring system for impact assessment."
 
 The AI writes ~300 tokens of YAML. The engine renders it immediately.
+
+Or generate a form from any MCP tool:
+
+```bash
+yfe generate --schema-file tools/my-mcp-tool.json
+yfe run forms/mcp/my-mcp-tool.yaml
+```
 
 ## Licence
 
