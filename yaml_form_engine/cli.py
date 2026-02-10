@@ -3,6 +3,7 @@
 Usage:
     yfe forms/my-form.yaml                        # Run a form (shorthand)
     yfe run forms/my-form.yaml                     # Run a form (explicit)
+    yfe submit forms/mcp/notion-search.yaml        # Launch, capture payload, exit
     yfe generate --schema-file tools/schema.json   # Generate form from MCP schema
     yfe generate --schema-stdin                    # Generate from piped JSON
     yfe list                                       # List available forms
@@ -11,8 +12,13 @@ Usage:
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
+import webbrowser
 from pathlib import Path
 
 
@@ -35,6 +41,139 @@ def _cmd_run(args):
     ]
 
     sys.exit(subprocess.call(cmd))
+
+
+def _extract_mcp_metadata(form_path: str) -> tuple:
+    """Extract form ID, MCP server, and tool from form YAML.
+
+    Returns (form_id, server, tool). Exits with error if not an MCP form.
+    """
+    import yaml
+
+    with open(form_path) as f:
+        form_def = yaml.safe_load(f)
+    form = form_def.get("form", form_def)
+    form_id = form.get("id", "form")
+    for step in form.get("steps", []):
+        if step.get("type") == "submit" and "mcp" in step:
+            return form_id, step["mcp"]["server"], step["mcp"]["tool"]
+    print("Error: Form has no MCP submit step", file=sys.stderr)
+    sys.exit(1)
+
+
+def _wait_for_server(url: str, timeout: float = 30.0, interval: float = 0.5) -> None:
+    """Poll the Streamlit health endpoint until it responds or timeout."""
+    health_url = f"{url}/_stcore/health"
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            resp = urllib.request.urlopen(health_url, timeout=2)
+            if resp.status == 200:
+                return
+        except (urllib.error.URLError, OSError):
+            pass
+        time.sleep(interval)
+    raise TimeoutError(f"Streamlit server did not start within {timeout}s")
+
+
+def _stop_server(proc: subprocess.Popen) -> None:
+    """Gracefully stop the Streamlit server process."""
+    if proc.poll() is None:
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+
+
+def _cmd_submit(args):
+    """Launch form, wait for completion, output payload JSON to stdout."""
+    form_path = os.path.abspath(args.form)
+    if not os.path.isfile(form_path):
+        print(f"Error: Form file not found: {form_path}", file=sys.stderr)
+        sys.exit(1)
+
+    form_id, server, tool = _extract_mcp_metadata(form_path)
+    port = args.port
+    url = f"http://localhost:{port}"
+
+    # Use project root for .form-state and Streamlit cwd
+    project_root = _find_project_root(form_path)
+    state_dir = Path(project_root) / ".form-state"
+    payload_file = state_dir / f"{form_id}-payload.json"
+
+    # Delete stale payload file
+    if payload_file.exists():
+        payload_file.unlink()
+
+    engine_path = os.path.join(os.path.dirname(__file__), "_app.py")
+
+    print(f"Launching form on port {port}...", file=sys.stderr)
+    proc = subprocess.Popen(
+        [
+            sys.executable, "-m", "streamlit", "run",
+            engine_path,
+            "--server.headless", "true",
+            "--server.port", port,
+            "--browser.gatherUsageStats", "false",
+            "--", "--form", form_path,
+        ],
+        cwd=project_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    try:
+        _wait_for_server(url)
+    except TimeoutError:
+        _stop_server(proc)
+        print("Error: Streamlit server failed to start", file=sys.stderr)
+        sys.exit(1)
+
+    if not args.no_browser:
+        webbrowser.open(url)
+        print(f"Opened {url} in browser", file=sys.stderr)
+    else:
+        print(f"Form available at {url}", file=sys.stderr)
+
+    print("Waiting for form submission...", file=sys.stderr)
+
+    # Poll for payload file
+    deadline = time.monotonic() + args.timeout
+    try:
+        while time.monotonic() < deadline:
+            if payload_file.exists():
+                with open(payload_file) as f:
+                    payload = json.load(f)
+                # Output structured JSON to stdout
+                output = {
+                    "server": server,
+                    "tool": tool,
+                    "arguments": payload,
+                }
+                print(json.dumps(output, indent=2))
+                _stop_server(proc)
+                sys.exit(0)
+            time.sleep(0.5)
+
+        # Timeout reached
+        print(f"Error: Timed out after {args.timeout}s waiting for submission", file=sys.stderr)
+        _stop_server(proc)
+        sys.exit(2)
+    except KeyboardInterrupt:
+        print("\nCancelled by user", file=sys.stderr)
+        _stop_server(proc)
+        sys.exit(130)
+
+
+def _find_project_root(form_path: str) -> str:
+    """Walk up from form_path to find the project root (contains pyproject.toml or .git)."""
+    current = Path(form_path).resolve().parent
+    for parent in [current, *current.parents]:
+        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+            return str(parent)
+    return str(current)
 
 
 def _cmd_generate(args):
@@ -105,6 +244,13 @@ def main():
     run_parser.add_argument("form", help="Path to the YAML form definition")
     run_parser.add_argument("--port", default=None, help="Streamlit port (default: 8501)")
 
+    # yfe submit <form.yaml>
+    submit_parser = subparsers.add_parser("submit", help="Launch form, capture payload for MCP execution")
+    submit_parser.add_argument("form", help="Path to the YAML form definition")
+    submit_parser.add_argument("--port", default="8503", help="Streamlit port (default: 8503)")
+    submit_parser.add_argument("--timeout", type=int, default=300, help="Max seconds to wait (default: 300)")
+    submit_parser.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
+
     # yfe generate
     gen_parser = subparsers.add_parser("generate", help="Generate form from MCP tool schema")
     gen_parser.add_argument("--schema-file", help="Path to JSON schema file")
@@ -154,6 +300,8 @@ def main():
 
     if args.command == "run":
         _cmd_run(args)
+    elif args.command == "submit":
+        _cmd_submit(args)
     elif args.command == "generate":
         _cmd_generate(args)
     elif args.command == "list":
