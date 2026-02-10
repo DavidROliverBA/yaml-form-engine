@@ -187,6 +187,7 @@ def run():
         range(len(steps)),
         format_func=lambda x: step_labels[x],
         index=st.session_state.current_step,
+        key="_yfe_step_nav",
     )
     st.session_state.current_step = selected_step
 
@@ -489,7 +490,7 @@ def _render_export_step(
 
     selected_format = st.radio("Export Format", format_ids, format_func=lambda x: next(
         (f.get("label", f["id"]) for f in formats if f["id"] == x), x
-    ), horizontal=True)
+    ), horizontal=True, key="_yfe_export_format")
 
     if st.button("Generate Export", type="primary"):
         output = export_form(

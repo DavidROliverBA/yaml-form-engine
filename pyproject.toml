@@ -20,6 +20,9 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
 ]
+e2e = [
+    "pytest-playwright>=0.5.0",
+]
 
 [project.scripts]
 yfe = "yaml_form_engine.cli:main"
@@ -33,3 +36,4 @@ include = ["yaml_form_engine*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["e2e: end-to-end browser tests (deselect with '-m not e2e')"]
