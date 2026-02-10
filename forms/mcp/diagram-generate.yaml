@@ -1,0 +1,44 @@
+form:
+  id: mcp-diagram-generate
+  title: Generate Architecture Diagram
+  description: Generate an architecture diagram using the Diagrams-as-Code Python library via MCP.
+  version: '1.0'
+  steps:
+    - id: parameters
+      title: Diagram Parameters
+      type: input
+      fields:
+        - id: code
+          label: Diagram Code (Python)
+          type: textarea
+          required: true
+          placeholder: |-
+            from diagrams import Diagram
+            from diagrams.aws.compute import Lambda
+            from diagrams.aws.database import DynamoDB
+
+            with Diagram("My Architecture"):
+                Lambda("Function") >> DynamoDB("Table")
+        - id: workspace_dir
+          label: Output Directory
+          type: text
+          default: './diagrams'
+    - id: review
+      title: Review
+      type: info
+      content: |-
+        Review your diagram code before generating.
+
+        **Tool:** `generate_diagram`
+
+        **Server:** `MCP_DOCKER`
+
+        The diagram will be generated as a PNG file in the specified output directory.
+    - id: submit
+      title: Submit
+      type: submit
+      mcp:
+        server: MCP_DOCKER
+        tool: generate_diagram
+      confirm: true
+      show_payload: true

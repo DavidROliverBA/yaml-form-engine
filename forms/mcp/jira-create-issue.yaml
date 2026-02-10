@@ -1,0 +1,74 @@
+form:
+  id: mcp-jira-create-issue
+  title: Create Jira Issue
+  description: Create a new issue in Jira with project, type, summary, and description.
+  version: '1.0'
+  steps:
+    - id: parameters
+      title: Issue Details
+      type: input
+      fields:
+        - id: projectKey
+          label: Project Key
+          type: text
+          required: true
+          placeholder: 'e.g., PROJ'
+        - id: issueType
+          label: Issue Type
+          type: select
+          required: true
+          options:
+            - value: Task
+              label: Task
+            - value: Story
+              label: Story
+            - value: Bug
+              label: Bug
+            - value: Epic
+              label: Epic
+            - value: Sub-task
+              label: Sub-task
+        - id: summary
+          label: Summary
+          type: text
+          required: true
+        - id: description
+          label: Description
+          type: textarea
+        - id: priority
+          label: Priority
+          type: radio
+          options:
+            - value: Highest
+              label: Highest
+            - value: High
+              label: High
+            - value: Medium
+              label: Medium
+            - value: Low
+              label: Low
+        - id: assignee
+          label: Assignee (Account ID)
+          type: text
+          placeholder: 'Jira account ID'
+        - id: labels
+          label: Labels (one per line)
+          type: textarea
+          parse_as: list
+    - id: review
+      title: Review
+      type: info
+      content: |-
+        Review the issue details before creating.
+
+        **Tool:** `createJiraIssue`
+
+        **Server:** `plugin_atlassian_atlassian`
+    - id: submit
+      title: Submit
+      type: submit
+      mcp:
+        server: plugin_atlassian_atlassian
+        tool: createJiraIssue
+      confirm: true
+      show_payload: true

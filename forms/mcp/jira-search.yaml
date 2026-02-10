@@ -1,0 +1,47 @@
+form:
+  id: mcp-jira-search
+  title: Search Jira Issues
+  description: Search for Jira issues using JQL (Jira Query Language).
+  version: '1.0'
+  steps:
+    - id: parameters
+      title: Search Parameters
+      type: input
+      fields:
+        - id: jql
+          label: JQL Query
+          type: textarea
+          required: true
+          placeholder: 'e.g., project = PROJ AND status = "In Progress" ORDER BY updated DESC'
+        - id: maxResults
+          label: Max Results
+          type: slider
+          min: 1
+          max: 20
+          default: 10
+        - id: fields
+          label: Fields to Return (one per line)
+          type: textarea
+          parse_as: list
+          placeholder: |-
+            summary
+            status
+            assignee
+            priority
+    - id: review
+      title: Review
+      type: info
+      content: |-
+        Review your JQL query before searching.
+
+        **Tool:** `searchJiraIssuesUsingJql`
+
+        **Server:** `plugin_atlassian_atlassian`
+    - id: submit
+      title: Submit
+      type: submit
+      mcp:
+        server: plugin_atlassian_atlassian
+        tool: searchJiraIssuesUsingJql
+      confirm: true
+      show_payload: true

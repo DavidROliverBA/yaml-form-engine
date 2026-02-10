@@ -24,6 +24,8 @@ from .data_resolver import (
 from .expressions import evaluate, evaluate_condition, interpolate
 from .exporters import export_form
 from .fields import render_field
+from .mcp_invoker import build_payload, format_mcp_command
+from .mcp_introspect import ToolSchema
 from .schema import SchemaError, validate_form_schema
 
 
@@ -277,6 +279,8 @@ def run():
         _render_export_step(step, form, responses, all_flat_items, filtered_items)
     elif step_type == "info":
         _render_info_step(step, form, responses)
+    elif step_type == "submit":
+        _render_submit_step(step, form, responses)
 
     # Auto-save
     save_state(form_id, responses)
@@ -528,6 +532,100 @@ def _render_info_step(step: dict, form: dict, responses: dict) -> None:
     content = step.get("content", "")
     if content:
         st.markdown(interpolate(content, responses, {"form": form}))
+
+
+def _render_submit_step(step: dict, form: dict, responses: dict) -> None:
+    """Render a submit step that builds and displays an MCP tool invocation payload."""
+    st.title(step["title"])
+
+    mcp = step.get("mcp", {})
+    server = mcp.get("server", "")
+    tool = mcp.get("tool", "")
+
+    st.markdown(f"**MCP Server:** `{server}`")
+    st.markdown(f"**Tool:** `{tool}`")
+
+    # Build a lightweight ToolSchema from form metadata
+    # Collect all parameter properties from input steps
+    param_properties = {}
+    param_required = []
+    for s in form.get("steps", []):
+        if s.get("type", "input") == "input":
+            for field in s.get("fields", []):
+                field_id = field["id"]
+                # Infer JSON Schema type from field type
+                field_type = field.get("type", "text")
+                schema_type = _field_type_to_schema_type(field_type)
+                param_properties[field_id] = {"type": schema_type}
+                if field.get("required"):
+                    param_required.append(field_id)
+
+    tool_schema = ToolSchema(
+        name=tool,
+        server=server,
+        description="",
+        parameters={
+            "type": "object",
+            "properties": param_properties,
+            "required": param_required,
+        },
+        required=param_required,
+    )
+
+    payload = build_payload(responses, tool_schema)
+
+    # Show payload preview
+    if step.get("show_payload", True):
+        st.subheader("Payload Preview")
+        payload_json = json.dumps(payload, indent=2)
+        st.code(payload_json, language="json")
+
+    # Action buttons
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if step.get("confirm", True):
+            if st.button("Copy Invocation", type="primary"):
+                command = format_mcp_command(server, tool, payload)
+                st.code(command)
+                st.success("Copy the above to invoke this tool in Claude Code.")
+
+    with col2:
+        # Save payload to file
+        payload_json = json.dumps(payload, indent=2)
+        form_id = form.get("id", "form")
+        st.download_button(
+            "Download Payload (JSON)",
+            payload_json,
+            file_name=f"{form_id}-payload.json",
+            mime="application/json",
+        )
+
+    # Also save to .form-state for programmatic access
+    state_dir = Path(".form-state")
+    state_dir.mkdir(exist_ok=True)
+    payload_file = state_dir / f"{form.get('id', 'form')}-payload.json"
+    with open(payload_file, "w") as f:
+        json.dump(payload, f, indent=2)
+    st.caption(f"Payload also saved to `{payload_file}`")
+
+
+def _field_type_to_schema_type(field_type: str) -> str:
+    """Map a YAML form field type back to a JSON Schema type."""
+    mapping = {
+        "text": "string",
+        "textarea": "string",
+        "select": "string",
+        "radio": "string",
+        "number": "number",
+        "slider": "number",
+        "date": "string",
+        "checkbox": "boolean",
+        "multiselect": "array",
+        "file": "string",
+        "score": "number",
+    }
+    return mapping.get(field_type, "string")
 
 
 # ---- Helpers ----

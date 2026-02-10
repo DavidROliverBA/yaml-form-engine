@@ -1,0 +1,58 @@
+form:
+  id: mcp-notion-create-page
+  title: Create Notion Page
+  description: Create a new page in a Notion database or as a child of an existing page.
+  version: '1.0'
+  steps:
+    - id: parent
+      title: Parent Location
+      type: input
+      fields:
+        - id: parent_type
+          label: Parent Type
+          type: radio
+          required: true
+          options:
+            - value: database_id
+              label: Database
+            - value: page_id
+              label: Page
+        - id: parent_id
+          label: Parent ID
+          type: text
+          required: true
+          placeholder: 'Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+    - id: parameters
+      title: Page Content
+      type: input
+      fields:
+        - id: title
+          label: Page Title
+          type: text
+          required: true
+        - id: icon_emoji
+          label: Icon (Emoji)
+          type: text
+          placeholder: 'e.g., 📄'
+        - id: content
+          label: Page Content (Markdown)
+          type: textarea
+    - id: review
+      title: Review
+      type: info
+      content: |-
+        Review your entries above before submitting.
+
+        **Tool:** `API-post-page`
+
+        **Server:** `MCP_DOCKER`
+
+        **Description:** Creates a page in Notion. The parent can be a database or another page.
+    - id: submit
+      title: Submit
+      type: submit
+      mcp:
+        server: MCP_DOCKER
+        tool: API-post-page
+      confirm: true
+      show_payload: true

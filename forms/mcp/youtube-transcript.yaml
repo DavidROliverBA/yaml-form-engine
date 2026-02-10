@@ -1,0 +1,39 @@
+form:
+  id: mcp-youtube-transcript
+  title: Get YouTube Transcript
+  description: Fetch the transcript of a YouTube video for analysis and note-taking.
+  version: '1.0'
+  steps:
+    - id: parameters
+      title: Video Details
+      type: input
+      fields:
+        - id: url
+          label: YouTube Video URL
+          type: text
+          required: true
+          placeholder: 'https://www.youtube.com/watch?v=...'
+        - id: lang
+          label: Language Code
+          type: text
+          default: 'en'
+          placeholder: 'e.g., en, fr, de'
+    - id: review
+      title: Review
+      type: info
+      content: |-
+        Review the video details before fetching the transcript.
+
+        **Tool:** `get_transcript`
+
+        **Server:** `MCP_DOCKER`
+
+        The transcript will be returned as plain text with timestamps.
+    - id: submit
+      title: Submit
+      type: submit
+      mcp:
+        server: MCP_DOCKER
+        tool: get_transcript
+      confirm: true
+      show_payload: true

@@ -1,0 +1,44 @@
+form:
+  id: mcp-confluence-create-page
+  title: Create Confluence Page
+  description: Create a new page in Confluence with title, space, and content.
+  version: '1.0'
+  steps:
+    - id: parameters
+      title: Page Details
+      type: input
+      fields:
+        - id: spaceId
+          label: Space ID
+          type: text
+          required: true
+          placeholder: 'Confluence space ID'
+        - id: title
+          label: Page Title
+          type: text
+          required: true
+        - id: parentPageId
+          label: Parent Page ID (optional)
+          type: text
+          placeholder: 'Leave empty for top-level page'
+        - id: body
+          label: Page Body (Confluence storage format or markdown)
+          type: textarea
+          required: true
+    - id: review
+      title: Review
+      type: info
+      content: |-
+        Review the page details before creating.
+
+        **Tool:** `createConfluencePage`
+
+        **Server:** `plugin_atlassian_atlassian`
+    - id: submit
+      title: Submit
+      type: submit
+      mcp:
+        server: plugin_atlassian_atlassian
+        tool: createConfluencePage
+      confirm: true
+      show_payload: true

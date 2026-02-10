@@ -12,7 +12,7 @@ VALID_FIELD_TYPES = {
 }
 
 VALID_STEP_TYPES = {
-    "input", "data_driven", "computed", "export", "info", "conditional",
+    "input", "data_driven", "computed", "export", "info", "conditional", "submit",
 }
 
 VALID_EXPORT_TEMPLATES = {
@@ -122,6 +122,8 @@ def _validate_step(step: dict, index: int, seen_ids: set) -> None:
         _validate_data_driven_step(step, ctx)
     elif step_type == "export":
         _validate_export_step(step, ctx)
+    elif step_type == "submit":
+        _validate_submit_step(step, ctx)
 
 
 def _validate_input_step(step: dict, ctx: str) -> None:
@@ -169,6 +171,14 @@ def _validate_data_driven_step(step: dict, ctx: str) -> None:
                 f"{fctx}.type '{field['type']}' is not valid. "
                 f"Must be one of: {VALID_FIELD_TYPES}"
             )
+
+
+def _validate_submit_step(step: dict, ctx: str) -> None:
+    mcp = step.get("mcp")
+    if not isinstance(mcp, dict):
+        raise SchemaError(f"{ctx} of type 'submit' requires an 'mcp' mapping with 'server' and 'tool'")
+    if "tool" not in mcp or not isinstance(mcp["tool"], str) or not mcp["tool"].strip():
+        raise SchemaError(f"{ctx}.mcp.tool is required and must be a non-empty string")
 
 
 def _validate_export_step(step: dict, ctx: str) -> None:
