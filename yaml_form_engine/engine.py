@@ -535,6 +535,19 @@ def _render_info_step(step: dict, form: dict, responses: dict) -> None:
         st.markdown(interpolate(content, responses, {"form": form}))
 
 
+def _write_decision(decision_file: Path, action: str) -> None:
+    """Write the user's action choice to a decision file for CLI polling."""
+    decision_file.parent.mkdir(exist_ok=True)
+    with open(decision_file, "w") as f:
+        json.dump({"action": action}, f)
+
+
+def _on_download_click(decision_file: Path) -> None:
+    """Callback for st.download_button to record the download decision."""
+    _write_decision(decision_file, "download")
+    st.session_state.submit_decision_made = True
+
+
 def _render_submit_step(step: dict, form: dict, responses: dict) -> None:
     """Render a submit step that builds and displays an MCP tool invocation payload."""
     st.title(step["title"])
@@ -574,40 +587,77 @@ def _render_submit_step(step: dict, form: dict, responses: dict) -> None:
     )
 
     payload = build_payload(responses, tool_schema)
+    payload_json = json.dumps(payload, indent=2)
+    form_id = form.get("id", "form")
 
     # Show payload preview
     if step.get("show_payload", True):
         st.subheader("Payload Preview")
-        payload_json = json.dumps(payload, indent=2)
         st.code(payload_json, language="json")
 
-    # Action buttons
-    col1, col2 = st.columns(2)
+    # Save payload to .form-state for programmatic access (always, as before)
+    state_dir = Path(".form-state")
+    state_dir.mkdir(exist_ok=True)
+    payload_file = state_dir / f"{form_id}-payload.json"
+    with open(payload_file, "w") as f:
+        json.dump(payload, f, indent=2)
+
+    # Decision file path
+    decision_file = state_dir / f"{form_id}-decision.json"
+
+    # Determine default action from query params (set by --action CLI flag)
+    default_action = st.query_params.get("default_action", None)
+
+    st.subheader("What would you like to do?")
+
+    # Prevent double-click
+    if "submit_decision_made" not in st.session_state:
+        st.session_state.submit_decision_made = False
+
+    disabled = st.session_state.submit_decision_made
+
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-        if step.get("confirm", True):
-            if st.button("Copy Invocation", type="primary"):
-                command = format_mcp_command(server, tool, payload)
-                st.code(command)
-                st.success("Copy the above to invoke this tool in Claude Code.")
+        execute_type = "primary" if default_action in (None, "execute") else "secondary"
+        if st.button(
+            "Execute via Claude Code",
+            type=execute_type,
+            disabled=disabled,
+            key="_yfe_action_execute",
+        ):
+            _write_decision(decision_file, "execute")
+            st.session_state.submit_decision_made = True
+            st.success("Payload sent to Claude Code.")
 
     with col2:
-        # Save payload to file
-        payload_json = json.dumps(payload, indent=2)
-        form_id = form.get("id", "form")
+        download_type = "primary" if default_action == "download" else "secondary"
         st.download_button(
-            "Download Payload (JSON)",
+            "Download Payload",
             payload_json,
             file_name=f"{form_id}-payload.json",
             mime="application/json",
+            disabled=disabled,
+            on_click=_on_download_click,
+            args=(decision_file,),
+            type=download_type,
+            key="_yfe_action_download",
         )
 
-    # Also save to .form-state for programmatic access
-    state_dir = Path(".form-state")
-    state_dir.mkdir(exist_ok=True)
-    payload_file = state_dir / f"{form.get('id', 'form')}-payload.json"
-    with open(payload_file, "w") as f:
-        json.dump(payload, f, indent=2)
+    with col3:
+        copy_type = "primary" if default_action == "clipboard" else "secondary"
+        if st.button(
+            "Copy & Close",
+            type=copy_type,
+            disabled=disabled,
+            key="_yfe_action_clipboard",
+        ):
+            command = format_mcp_command(server, tool, payload)
+            _write_decision(decision_file, "clipboard")
+            st.session_state.submit_decision_made = True
+            st.code(command)
+            st.info("Copy the command above. Form closing shortly.")
+
     st.caption(f"Payload also saved to `{payload_file}`")
 
 

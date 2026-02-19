@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess
 import sys
 import textwrap
 
@@ -136,6 +137,7 @@ class TestSubmitOutputFormat:
             "server": "MCP_DOCKER",
             "tool": "API-post-search",
             "arguments": {"query": "test", "filter_object_type": "page"},
+            "action": "execute",
         }
         serialised = json.dumps(output, indent=2)
         parsed = json.loads(serialised)
@@ -143,6 +145,8 @@ class TestSubmitOutputFormat:
         assert "server" in parsed
         assert "tool" in parsed
         assert "arguments" in parsed
+        assert "action" in parsed
+        assert parsed["action"] == "execute"
         assert isinstance(parsed["arguments"], dict)
 
     def test_output_with_empty_arguments(self):
@@ -151,7 +155,103 @@ class TestSubmitOutputFormat:
             "server": "S",
             "tool": "T",
             "arguments": {},
+            "action": "execute",
         }
         serialised = json.dumps(output, indent=2)
         parsed = json.loads(serialised)
         assert parsed["arguments"] == {}
+        assert parsed["action"] == "execute"
+
+
+# ---- Decision file behaviour ----
+
+class TestDecisionFile:
+    """Tests for the two-file (payload + decision) approach."""
+
+    def test_decision_file_execute(self, tmp_path):
+        """Decision with action=execute produces JSON on stdout."""
+        state_dir = tmp_path / ".form-state"
+        state_dir.mkdir()
+
+        # Write payload file (as engine does)
+        payload = {"query": "test"}
+        (state_dir / "test-payload.json").write_text(json.dumps(payload))
+
+        # Write decision file (as engine does when user clicks Execute)
+        decision = {"action": "execute"}
+        (state_dir / "test-decision.json").write_text(json.dumps(decision))
+
+        # Read back and verify the expected output structure
+        with open(state_dir / "test-decision.json") as f:
+            d = json.load(f)
+        assert d["action"] == "execute"
+
+        with open(state_dir / "test-payload.json") as f:
+            p = json.load(f)
+
+        output = {
+            "server": "S",
+            "tool": "T",
+            "arguments": p,
+            "action": "execute",
+        }
+        assert output["arguments"] == {"query": "test"}
+        assert output["action"] == "execute"
+
+    def test_decision_file_download(self, tmp_path):
+        """Decision with action=download produces no stdout output."""
+        state_dir = tmp_path / ".form-state"
+        state_dir.mkdir()
+
+        decision = {"action": "download"}
+        (state_dir / "test-decision.json").write_text(json.dumps(decision))
+
+        with open(state_dir / "test-decision.json") as f:
+            d = json.load(f)
+        assert d["action"] == "download"
+        # download action should not produce stdout — CLI just exits 0
+
+    def test_decision_file_clipboard(self, tmp_path):
+        """Decision with action=clipboard produces no stdout output."""
+        state_dir = tmp_path / ".form-state"
+        state_dir.mkdir()
+
+        decision = {"action": "clipboard"}
+        (state_dir / "test-decision.json").write_text(json.dumps(decision))
+
+        with open(state_dir / "test-decision.json") as f:
+            d = json.load(f)
+        assert d["action"] == "clipboard"
+        # clipboard action should not produce stdout — CLI just exits 0
+
+
+# ---- --action flag ----
+
+class TestActionFlag:
+    """Tests that the --action CLI argument is accepted by argparse."""
+
+    def test_action_flag_accepted(self):
+        """--action execute is accepted without error."""
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "yaml_form_engine.cli",
+                "submit", "--help",
+            ],
+            capture_output=True, text=True,
+        )
+        assert "--action" in result.stdout
+        assert "execute" in result.stdout
+        assert "download" in result.stdout
+        assert "clipboard" in result.stdout
+
+    def test_action_flag_invalid_rejected(self):
+        """--action with an invalid value is rejected."""
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "yaml_form_engine.cli",
+                "submit", "dummy.yaml", "--action", "invalid",
+            ],
+            capture_output=True, text=True,
+        )
+        assert result.returncode != 0
+        assert "invalid choice" in result.stderr

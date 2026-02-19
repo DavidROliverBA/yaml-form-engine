@@ -88,7 +88,7 @@ def _stop_server(proc: subprocess.Popen) -> None:
 
 
 def _cmd_submit(args):
-    """Launch form, wait for completion, output payload JSON to stdout."""
+    """Launch form, wait for user action choice, behave accordingly."""
     form_path = os.path.abspath(args.form)
     if not os.path.isfile(form_path):
         print(f"Error: Form file not found: {form_path}", file=sys.stderr)
@@ -102,10 +102,12 @@ def _cmd_submit(args):
     project_root = _find_project_root(form_path)
     state_dir = Path(project_root) / ".form-state"
     payload_file = state_dir / f"{form_id}-payload.json"
+    decision_file = state_dir / f"{form_id}-decision.json"
 
-    # Delete stale payload file
-    if payload_file.exists():
-        payload_file.unlink()
+    # Delete stale files
+    for stale in (payload_file, decision_file):
+        if stale.exists():
+            stale.unlink()
 
     engine_path = os.path.join(os.path.dirname(__file__), "_app.py")
 
@@ -131,29 +133,43 @@ def _cmd_submit(args):
         print("Error: Streamlit server failed to start", file=sys.stderr)
         sys.exit(1)
 
+    # Build open URL — pass default_action as query param if --action given
+    open_url = f"{url}?default_action={args.action}" if args.action else url
+
     if not args.no_browser:
-        webbrowser.open(url)
-        print(f"Opened {url} in browser", file=sys.stderr)
+        webbrowser.open(open_url)
+        print(f"Opened {open_url} in browser", file=sys.stderr)
     else:
         print(f"Form available at {url}", file=sys.stderr)
 
     print("Waiting for form submission...", file=sys.stderr)
 
-    # Poll for payload file
+    # Poll for decision file (written when user clicks an action button)
     deadline = time.monotonic() + args.timeout
     try:
         while time.monotonic() < deadline:
-            if payload_file.exists():
-                with open(payload_file) as f:
-                    payload = json.load(f)
-                # Output structured JSON to stdout
-                output = {
-                    "server": server,
-                    "tool": tool,
-                    "arguments": payload,
-                }
-                print(json.dumps(output, indent=2))
-                # Brief pause so the browser finishes rendering before we kill the server
+            if decision_file.exists():
+                with open(decision_file) as f:
+                    decision = json.load(f)
+                action = decision.get("action", "execute")
+
+                if action == "execute":
+                    # Read the payload and output structured JSON
+                    with open(payload_file) as f:
+                        payload = json.load(f)
+                    output = {
+                        "server": server,
+                        "tool": tool,
+                        "arguments": payload,
+                        "action": "execute",
+                    }
+                    print(json.dumps(output, indent=2))
+                elif action == "download":
+                    print("User downloaded payload", file=sys.stderr)
+                elif action == "clipboard":
+                    print("User copied invocation", file=sys.stderr)
+
+                # Brief pause so the browser finishes rendering
                 time.sleep(2)
                 _stop_server(proc)
                 sys.exit(0)
@@ -252,6 +268,11 @@ def main():
     submit_parser.add_argument("--port", default="8503", help="Streamlit port (default: 8503)")
     submit_parser.add_argument("--timeout", type=int, default=300, help="Max seconds to wait (default: 300)")
     submit_parser.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
+    submit_parser.add_argument(
+        "--action", default=None,
+        choices=["execute", "download", "clipboard"],
+        help="Pre-select default action (user still sees all buttons)",
+    )
 
     # yfe generate
     gen_parser = subparsers.add_parser("generate", help="Generate form from MCP tool schema")

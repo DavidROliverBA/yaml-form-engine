@@ -39,8 +39,41 @@ def _wait_for_server(url: str, timeout: float = 30.0) -> None:
 class TestSubmitCommand:
     """Full yfe submit flow: launch, fill form, capture JSON output."""
 
+    def _fill_notion_search_form(self, page, url):
+        """Fill the notion-search form fields and navigate to Submit step."""
+        page.goto(url)
+        page.wait_for_selector('[data-testid="stSidebar"]', timeout=15000)
+        page.wait_for_timeout(1000)
+
+        # Search Query
+        query_container = page.locator(
+            '[data-testid="stTextInput"]', has_text="Search Query"
+        )
+        query_input = query_container.locator("input")
+        query_input.click()
+        query_input.fill("architecture decisions")
+        query_input.press("Tab")
+        page.wait_for_timeout(500)
+
+        # Select "Pages" radio
+        radio_container = page.locator(
+            '[data-testid="stRadio"]', has_text="Filter by Type"
+        )
+        radio_container.locator(
+            'label[data-baseweb="radio"]', has_text="Pages"
+        ).click()
+        page.wait_for_timeout(500)
+
+        # Navigate to Submit step
+        sidebar = page.locator('[data-testid="stSidebar"]')
+        sidebar.locator(
+            '[data-testid="stRadio"] label[data-baseweb="radio"]',
+            has_text="Submit",
+        ).click()
+        page.wait_for_timeout(2000)
+
     def test_notion_search_submit(self, page):
-        """Launch submit for notion-search, fill form, verify JSON output."""
+        """Launch submit for notion-search, fill form, click Execute, verify JSON output."""
         form_path = str(PROJECT_DIR / "forms" / "mcp" / "notion-search.yaml")
         url = f"http://localhost:{SUBMIT_PORT}"
 
@@ -59,43 +92,14 @@ class TestSubmitCommand:
         )
 
         try:
-            # Wait for the Streamlit server to be ready
             _wait_for_server(url)
+            self._fill_notion_search_form(page, url)
 
-            # Navigate to the form
-            page.goto(url)
-            page.wait_for_selector('[data-testid="stSidebar"]', timeout=15000)
+            # Click Execute via Claude Code button
+            page.locator('button:has-text("Execute via Claude Code")').click()
             page.wait_for_timeout(1000)
 
-            # Fill the form
-            # Search Query
-            query_container = page.locator(
-                '[data-testid="stTextInput"]', has_text="Search Query"
-            )
-            query_input = query_container.locator("input")
-            query_input.click()
-            query_input.fill("architecture decisions")
-            query_input.press("Tab")
-            page.wait_for_timeout(500)
-
-            # Select "Pages" radio
-            radio_container = page.locator(
-                '[data-testid="stRadio"]', has_text="Filter by Type"
-            )
-            radio_container.locator(
-                'label[data-baseweb="radio"]', has_text="Pages"
-            ).click()
-            page.wait_for_timeout(500)
-
-            # Navigate to Submit step
-            sidebar = page.locator('[data-testid="stSidebar"]')
-            sidebar.locator(
-                '[data-testid="stRadio"] label[data-baseweb="radio"]',
-                has_text="Submit",
-            ).click()
-            page.wait_for_timeout(2000)
-
-            # Wait for the subprocess to capture the payload and exit
+            # Wait for the subprocess to capture the decision and exit
             stdout, stderr = proc.communicate(timeout=30)
             assert proc.returncode == 0, f"Submit exited with {proc.returncode}: {stderr.decode()}"
 
@@ -105,9 +109,92 @@ class TestSubmitCommand:
             assert output["tool"] == "API-post-search"
             assert output["arguments"]["query"] == "architecture decisions"
             assert output["arguments"]["filter_object_type"] == "page"
+            assert output["action"] == "execute"
 
         except Exception:
             # Clean up on failure
+            if proc.poll() is None:
+                proc.send_signal(signal.SIGTERM)
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            raise
+
+    def test_download_action(self, page):
+        """Click Download Payload, verify no stdout and exit 0."""
+        form_path = str(PROJECT_DIR / "forms" / "mcp" / "notion-search.yaml")
+        url = f"http://localhost:{SUBMIT_PORT + 3}"
+
+        proc = subprocess.Popen(
+            [
+                sys.executable, "-m", "yaml_form_engine.cli",
+                "submit", form_path,
+                "--port", str(SUBMIT_PORT + 3),
+                "--no-browser",
+                "--timeout", "60",
+            ],
+            cwd=str(PROJECT_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        try:
+            _wait_for_server(url)
+            self._fill_notion_search_form(page, url)
+
+            # Click Download Payload button
+            page.locator('button:has-text("Download Payload")').click()
+            page.wait_for_timeout(1000)
+
+            stdout, stderr = proc.communicate(timeout=30)
+            assert proc.returncode == 0, f"Submit exited with {proc.returncode}: {stderr.decode()}"
+            # Download action produces no stdout
+            assert stdout.decode().strip() == ""
+            assert b"downloaded payload" in stderr
+
+        except Exception:
+            if proc.poll() is None:
+                proc.send_signal(signal.SIGTERM)
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            raise
+
+    def test_copy_action(self, page):
+        """Click Copy & Close, verify no stdout and exit 0."""
+        form_path = str(PROJECT_DIR / "forms" / "mcp" / "notion-search.yaml")
+        url = f"http://localhost:{SUBMIT_PORT + 4}"
+
+        proc = subprocess.Popen(
+            [
+                sys.executable, "-m", "yaml_form_engine.cli",
+                "submit", form_path,
+                "--port", str(SUBMIT_PORT + 4),
+                "--no-browser",
+                "--timeout", "60",
+            ],
+            cwd=str(PROJECT_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        try:
+            _wait_for_server(url)
+            self._fill_notion_search_form(page, url)
+
+            # Click Copy & Close button
+            page.locator('button:has-text("Copy & Close")').click()
+            page.wait_for_timeout(1000)
+
+            stdout, stderr = proc.communicate(timeout=30)
+            assert proc.returncode == 0, f"Submit exited with {proc.returncode}: {stderr.decode()}"
+            # Copy action produces no stdout
+            assert stdout.decode().strip() == ""
+            assert b"copied invocation" in stderr
+
+        except Exception:
             if proc.poll() is None:
                 proc.send_signal(signal.SIGTERM)
                 try:
